@@ -1,0 +1,16 @@
+{
+  "name": "comparelist-backend",
+  "version": "1.0.0",
+  "description": "Backend server",
+  "main": "server.js",
+  "author": "Jack Nolan",
+  "license": "MIT",
+  "engines": {
+    "node": "12.x"
+  },
+  "dependencies": {
+    "axios": "^0.26.1",
+    "cheerio": "^1.0.0-rc.10",
+    "express": "^4.17.3"
+  }
+}
