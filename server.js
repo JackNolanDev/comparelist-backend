@@ -30,7 +30,9 @@ const lists = {};
 // run immidiatly to populate with data
 // then the cron job will update the data automatically once a day
 jobs.updateLists(lists);
-cron.schedule('*/1 * * * *', () => jobs.updateLists(lists));
+// run cron job once a day at 5 AM
+cron.schedule('0 5 * * *', () => jobs.updateLists(lists));
+// '*/1 * * * *' for once a minute
 
 app.get('/lists', (req, res) => {
   res.json(lists);
