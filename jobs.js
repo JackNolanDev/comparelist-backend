@@ -1,6 +1,6 @@
 const axios = require('axios').default;
 const cheerio = require('cheerio');
-const fs = require('fs')
+// const fs = require('fs')
 
 const HARDCOVER_FICTION = "hardcoverFiction";
 const HARDCOVER_NONFICTION = "hardcoverNonfiction";
@@ -14,6 +14,16 @@ const NY_TIMES_PAPERBACK_FICTION = "/lists/current/trade-fiction-paperback.json"
 const NY_TIMES_PAPERBACK_NONFICTION = "/lists/current/paperback-nonfiction.json";
 
 const INDIE_BOUND_URL = "https://www.indiebound.org/indie-bestsellers"
+
+const PUBLISHERS_HARDCOVER_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/hardcoverfiction.html"
+const PUBLISHERS_HARDCOVER_NONFICTION_URL = "https://www.publishersweekly.com/pw/nielsen/HardcoverNonfiction.html"
+const PUBLISHERS_PAPERBACK_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/tradepaper.html"
+
+const NY_TIMES_DISP = "The New York Times";
+const INDIE_BOUND_DISP = "IndieBound";
+const PUBLISHERS_DISP = "Publishers Weekly";
+
+// ####################### NYTIMES #######################
 
 const nytimesAPI = async (route) => {
   return await axios
@@ -46,7 +56,7 @@ const nytimesList = (data) => {
 }
 
 const getNYTimesData = async () => {
-  const nytimesLists = {};
+  const nytimesLists = { disp: NY_TIMES_DISP };
   const lists = [
     [HARDCOVER_FICTION, NY_TIMES_HARCOVER_FICTION],
     [HARDCOVER_NONFICTION, NY_TIMES_HARCOVER_NONFICTION],
@@ -62,6 +72,8 @@ const getNYTimesData = async () => {
   return nytimesLists;
 }
 
+// ####################### Indie Bound #######################
+
 const formatDate = (dateStr) => {
   const date = new Date(dateStr);
   let day = date.getDate().toString();
@@ -72,7 +84,7 @@ const formatDate = (dateStr) => {
   if (month.length < 2) {
     month = "0" + month;
   }
-  return `${date.getFullYear()}-${day}-${month}`;
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 const indieBoundDate = ($) => {
@@ -124,7 +136,7 @@ const indieBoundList = ($, el, name, date) => {
 }
 
 const getIndieBoundData = async () => {
-  const indieBoundLists = {};
+  const indieBoundLists = { disp: INDIE_BOUND_DISP };
   const page = await axios.get(INDIE_BOUND_URL).then((res) => res.data);
   // const page = fs.readFileSync('./indie.html', 'utf8');
   const $ = cheerio.load(page);
@@ -148,6 +160,108 @@ const getIndieBoundData = async () => {
   return indieBoundLists;
 }
 
+// ####################### Publishers Weekly #######################
+
+const publishersList = (page) => {
+  const $ = cheerio.load(page);
+  const nameS = "#content-main > div.nielsen-wrapper > div.nielsen-right-column > div.nielsen-header.nielsen-individual";
+  const name = $(nameS).eq(0).text();
+
+  const dateS = "#content-main > div.nielsen-wrapper > div.nielsen-right-column > div:nth-child(5) > p:nth-child(1) > a";
+  const linkWithDate = $(dateS).eq(0).attr('href');
+  const dateRegex = /(january|february|march|april|may|june|july|august|september|october|november|december)-\d+-\d+/;
+  const date = formatDate(linkWithDate.match(dateRegex));
+
+  const books = [];
+  const tableS = "#content-main > div.nielsen-wrapper > div.nielsen-right-column > table > tbody";
+  const tableElements = $(tableS).children("tr");
+  tableElements.each((idx, el) => {
+    if (idx === 0) {
+      return;
+    }
+    const book = {};
+    const cols = $(el).children("td");
+    cols.each((idx, el) => {
+      switch (idx) {
+        case 0:
+          book.rank = parseInt($(el).text());
+          break;
+        case 1:
+          const lastRank = parseInt($(el).text());
+          book.lastRank = isNaN(lastRank) ? 0 : lastRank;
+          break;
+        case 2:
+          book.wol = parseInt($(el).text());
+          break;
+        case 3:
+          const info = $(el).children("div");
+          info.each((idx, el) => {
+            switch (idx) {
+              case 0:
+                // title
+                const title = $(el).text().trim();
+                book.title = title;
+                break;
+              case 1:
+                // author
+                const author = $(el).text().trim();
+                book.author = author;
+                break;
+              case 2:
+                // publisher
+                const pub = $(el).text();
+                const pubRegex = /, \$\d+.\d+ \(\d+\)/;
+                try {
+                  const publisher = pub.substring(0, pub.match(pubRegex).index);
+                  book.publisher = publisher;
+                } catch (e) {
+                  book.publisher = "";
+                }
+                // cover image taken from open library using isbn
+                const isbnRegex = /\d+-\d+-\d+-\d+-\d+/;
+                try {
+                  const isbn = pub.match(isbnRegex)[0];
+                  const isbnNumber = isbn.replace(/-/g, "");
+                  book.image = `https://covers.openlibrary.org/b/isbn/${isbnNumber}-M.jpg`
+                } catch (e) {
+                  // intentionally empty
+                }
+                break;
+            }
+          });
+          break;
+      }
+    });
+
+    books.push(book);
+  });
+
+  return {
+    name,
+    date,
+    books,
+  };
+}
+
+const getPublishersData = async () => {
+  const publishersLists = { disp: PUBLISHERS_DISP };
+
+  const lists = [
+    [HARDCOVER_FICTION, PUBLISHERS_HARDCOVER_FICTION_URL],
+    [HARDCOVER_NONFICTION, PUBLISHERS_HARDCOVER_NONFICTION_URL],
+    [PAPERBACK_FICTION, PUBLISHERS_PAPERBACK_FICTION_URL],
+  ];
+
+  lists.forEach(async (pair) => {
+    const page = await axios.get(pair[1]).then((res) => res.data);
+    if (page) {
+      publishersLists[pair[0]] = publishersList(page);
+    }
+  });
+
+  return publishersLists;
+}
+
 const updateLists = async (lists) => {
   if (process.env.NODE_ENV !== "production") {
     console.log("running poller!");
@@ -155,6 +269,7 @@ const updateLists = async (lists) => {
 
   lists.nyt = await getNYTimesData();
   lists.indie = await getIndieBoundData();
+  lists.publishers = await getPublishersData();
 
   if (process.env.NODE_ENV !== "production") {
     console.log("done running poller!");
