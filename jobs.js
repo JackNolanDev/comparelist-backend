@@ -1,27 +1,38 @@
 const axios = require('axios').default;
 const cheerio = require('cheerio');
+const toTitleCase = require('to-title-case');
 // const fs = require('fs')
 
 const HARDCOVER_FICTION = "hardcoverFiction";
 const HARDCOVER_NONFICTION = "hardcoverNonfiction";
 const PAPERBACK_FICTION = "paperbackFiction";
 const PAPERBACK_NONFICTION = "paperbackNonfiction";
+const MASS_MARKET = "massMarket";
+const PICTURE_BOOK = "pictureBook";
+const ADVICE = "advice";
 
 const NY_TIMES_API_URL = "https://api.nytimes.com/svc/books/v3";
 const NY_TIMES_HARCOVER_FICTION = "/lists/current/hardcover-fiction.json";
 const NY_TIMES_HARCOVER_NONFICTION = "/lists/current/hardcover-nonfiction.json";
 const NY_TIMES_PAPERBACK_FICTION = "/lists/current/trade-fiction-paperback.json";
 const NY_TIMES_PAPERBACK_NONFICTION = "/lists/current/paperback-nonfiction.json";
+const NY_TIMES_MASS_MARKET = "/lists/current/mass-market-monthly.json";
+const NY_TIMES_PICTURE_BOOK = "/lists/current/picture-books.json";
+const NY_TIMES_ADVICE = "/lists/current/advice-how-to-and-miscellaneous.json";
 
-const INDIE_BOUND_URL = "https://www.indiebound.org/indie-bestsellers"
+const INDIE_BOUND_URL = "https://www.indiebound.org/indie-bestsellers";
 
-const PUBLISHERS_HARDCOVER_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/hardcoverfiction.html"
-const PUBLISHERS_HARDCOVER_NONFICTION_URL = "https://www.publishersweekly.com/pw/nielsen/HardcoverNonfiction.html"
-const PUBLISHERS_PAPERBACK_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/tradepaper.html"
+const PUBLISHERS_HARDCOVER_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/hardcoverfiction.html";
+const PUBLISHERS_HARDCOVER_NONFICTION_URL = "https://www.publishersweekly.com/pw/nielsen/HardcoverNonfiction.html";
+const PUBLISHERS_PAPERBACK_FICTION_URL = "https://www.publishersweekly.com/pw/nielsen/tradepaper.html";
+const PUBLISHERS_MASS_MARKET_URL = "https://www.publishersweekly.com/pw/nielsen/massmarket.html";
+const PUBLISHERS_PICTURE_BOOK_URL = "https://www.publishersweekly.com/pw/nielsen/kidspicture.html";
 
 const NY_TIMES_DISP = "The New York Times";
 const INDIE_BOUND_DISP = "IndieBound";
 const PUBLISHERS_DISP = "Publishers Weekly";
+
+const WEEKLY_RATE = "weekly";
 
 // ####################### NYTIMES #######################
 
@@ -38,7 +49,7 @@ const nytimesAPI = async (route) => {
 const nytimesList = (data) => {
   const books = data.results.books.map((book) => {
     return {
-      title: book.title,
+      title: toTitleCase(book.title),
       author: book.author,
       publisher: book.publisher,
       desc: book.description,
@@ -51,6 +62,7 @@ const nytimesList = (data) => {
   return {
     name: data.results.display_name,
     date: data.results.bestsellers_date,
+    rate: data.results.updated.toLowerCase(),
     books,
   };
 }
@@ -62,6 +74,9 @@ const getNYTimesData = async () => {
     [HARDCOVER_NONFICTION, NY_TIMES_HARCOVER_NONFICTION],
     [PAPERBACK_FICTION, NY_TIMES_PAPERBACK_FICTION],
     [PAPERBACK_NONFICTION, NY_TIMES_PAPERBACK_NONFICTION],
+    [MASS_MARKET, NY_TIMES_MASS_MARKET],
+    [PICTURE_BOOK, NY_TIMES_PICTURE_BOOK],
+    [ADVICE, NY_TIMES_ADVICE],
   ];
   lists.forEach(async (pair) => {
     const data = await nytimesAPI(pair[1]);
@@ -131,6 +146,7 @@ const indieBoundList = ($, el, name, date) => {
   return {
     name,
     date,
+    rate: WEEKLY_RATE,
     books
   }
 }
@@ -148,6 +164,8 @@ const getIndieBoundData = async () => {
     [HARDCOVER_NONFICTION, "Hardcover Nonfiction Bestsellers"],
     [PAPERBACK_FICTION, "Trade Paperback Fiction Bestsellers"],
     [PAPERBACK_NONFICTION, "Trade Paperback Nonfiction Bestsellers"],
+    [MASS_MARKET, "Mass Market Bestsellers"],
+    [PICTURE_BOOK, "Children's Illustrated Bestsellers"],
   ]
 
   const carousels = $("#indie-bestsellers").find(".owl-carousel");
@@ -239,6 +257,7 @@ const publishersList = (page) => {
   return {
     name,
     date,
+    rate: WEEKLY_RATE,
     books,
   };
 }
@@ -250,6 +269,8 @@ const getPublishersData = async () => {
     [HARDCOVER_FICTION, PUBLISHERS_HARDCOVER_FICTION_URL],
     [HARDCOVER_NONFICTION, PUBLISHERS_HARDCOVER_NONFICTION_URL],
     [PAPERBACK_FICTION, PUBLISHERS_PAPERBACK_FICTION_URL],
+    [MASS_MARKET, PUBLISHERS_MASS_MARKET_URL],
+    [PICTURE_BOOK, PUBLISHERS_PICTURE_BOOK_URL],
   ];
 
   lists.forEach(async (pair) => {
